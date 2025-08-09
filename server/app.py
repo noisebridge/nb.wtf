@@ -66,9 +66,10 @@ def update():
   return 'Updated!'
 
 
-@app.route('/w/<slug>')
+@app.route('/w/<path:slug>')
 def wiki_redirect(slug):
-  final_link = urljoin(WIKI_BASE_URL, slug)
+  colon_escaped = slug.replace(':', '%3A')
+  final_link = urljoin(WIKI_BASE_URL, colon_escaped)
   return flask.redirect(final_link)
 
 @app.route('/<slug>')
