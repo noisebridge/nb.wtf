@@ -7,8 +7,8 @@ app = 'nb-wtf-server'
 primary_region = 'sjc'
 
 [build]
-  builder = "paketobuildpacks/builder:base"
-  buildpacks = ["gcr.io/paketo-buildpacks/python"]
+  builder = "paketobuildpacks/builder-jammy-full"
+  buildpacks = ["docker.io/paketobuildpacks/python"]
 
 [http_service]
   internal_port = 8080
