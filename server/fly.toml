@@ -3,12 +3,8 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'nb-wtf-server'
+app = 'nb-wtf'
 primary_region = 'sjc'
-
-[build]
-  builder = "paketobuildpacks/builder-jammy-full"
-  buildpacks = ["docker.io/paketobuildpacks/python"]
 
 [http_service]
   internal_port = 8080
