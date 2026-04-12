@@ -39,7 +39,10 @@ def index():
 
 def _parse_wiki():
     resp = requests.get(PAGE_URL, headers={"User-Agent": USER_AGENT})
-    resp.raise_for_status()
+    try:
+        resp.raise_for_status()
+    except requests.HTTPError as e:
+        flask.abort(resp.status_code, f"Failed to fetch nb.wtf page:\n\n{e}")
 
     soup = BeautifulSoup(resp.text, "html.parser")
 
