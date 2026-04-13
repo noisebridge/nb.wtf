@@ -4,6 +4,7 @@ load_dotenv()
 
 import os
 import re
+import sqlite3
 from io import BytesIO
 from urllib.parse import urljoin
 
@@ -11,10 +12,9 @@ import flask
 import requests
 import segno
 from bs4 import BeautifulSoup
-from pymongo import MongoClient
 
 app = flask.Flask(__name__)
-MONGODB_URI = os.environ["MONGODB_URI"]
+SQLITE_PATH = os.environ.get("SQLITE_PATH", "nbwtf.db")
 PAGE_URL = os.environ["PAGE_URL"]
 WIKI_BASE_URL = os.environ["WIKI_BASE_URL"]
 USER_AGENT = "nb-wtf/1.0 <audiodude@gmail.com>"
@@ -22,12 +22,22 @@ USER_AGENT = "nb-wtf/1.0 <audiodude@gmail.com>"
 RE_SELF_LINK = re.compile(r"^https?://nb.wtf")
 
 
-def update_db(mapping):
-    client = MongoClient(MONGODB_URI)
-    client.nbwtf.links.drop()
+def get_db():
+    conn = sqlite3.connect(SQLITE_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS links (slug TEXT PRIMARY KEY, url TEXT NOT NULL)"
+    )
+    return conn
 
-    for slug, url in mapping.items():
-        client.nbwtf.links.insert_one({"slug": slug, "url": url})
+
+def update_db(mapping):
+    with get_db() as conn:
+        conn.execute("DELETE FROM links")
+        conn.executemany(
+            "INSERT INTO links (slug, url) VALUES (?, ?)",
+            list(mapping.items()),
+        )
 
 
 def qr_code(link, mimetype="image/png", scale=8):
@@ -80,12 +90,14 @@ def wiki_redirect(slug):
 
 @app.route("/<slug>")
 def redirect(slug):
-    client = MongoClient(MONGODB_URI)
-    link = client.nbwtf.links.find_one({"slug": slug})
-    if not link:
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT url FROM links WHERE slug = ?", (slug,)
+        ).fetchone()
+    if not row:
         flask.abort(404)
 
-    final_link = link["url"]
+    final_link = row["url"]
     if not final_link.startswith("http"):
         final_link = WIKI_BASE_URL + final_link
 
