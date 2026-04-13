@@ -18,10 +18,6 @@ RUN pipenv install --deploy --system
 # Copy application code
 COPY app.py ./
 
-# Create a non-root user to run the application
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
-
 # Expose port 8080
 EXPOSE 8080
 

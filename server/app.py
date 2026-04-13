@@ -73,7 +73,7 @@ def update():
         cols = row.find_all("td")
         if not cols:
             continue
-        slug, url = cols[0].text, cols[1].text
+        slug, url = cols[0].text.strip(), cols[1].text.strip()
         mapping[slug] = url
 
     update_db(mapping)
