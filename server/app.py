@@ -15,7 +15,6 @@ from bs4 import BeautifulSoup
 
 app = flask.Flask(__name__)
 SQLITE_PATH = os.environ.get("SQLITE_PATH", "nbwtf.db")
-PAGE_URL = os.environ["PAGE_URL"]
 WIKI_BASE_URL = os.environ["WIKI_BASE_URL"]
 USER_AGENT = "nb-wtf/1.0 <audiodude@gmail.com>"
 
@@ -62,6 +61,7 @@ def index():
 def update():
     print("on_update")
 
+    PAGE_URL = urljoin(WIKI_BASE_URL, "Nb.wtf")
     resp = requests.get(PAGE_URL, headers={"User-Agent": USER_AGENT})
     resp.raise_for_status()
 
@@ -91,9 +91,7 @@ def wiki_redirect(slug):
 @app.route("/<slug>")
 def redirect(slug):
     with get_db() as conn:
-        row = conn.execute(
-            "SELECT url FROM links WHERE slug = ?", (slug,)
-        ).fetchone()
+        row = conn.execute("SELECT url FROM links WHERE slug = ?", (slug,)).fetchone()
     if not row:
         flask.abort(404)
 
