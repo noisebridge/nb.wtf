@@ -61,7 +61,6 @@ def _parse_wiki():
 def redirect(slug):
     print("got request for:", slug)
     mapping = _parse_wiki()
-    print("mapping:", mapping)
     final_link = mapping.get(slug)
     if not final_link:
         flask.abort(404)
