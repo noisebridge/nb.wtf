@@ -52,7 +52,7 @@ def _parse_wiki():
         cols = row.find_all("td")
         if not cols:
             continue
-        slug, url = cols[0].text, cols[1].text
+        slug, url = cols[0].text.strip(), cols[1].text.strip()
         mapping[slug] = url
     return mapping
 
@@ -61,6 +61,7 @@ def _parse_wiki():
 def redirect(slug):
     print("got request for:", slug)
     mapping = _parse_wiki()
+    print("mapping:", mapping)
     final_link = mapping.get(slug)
     if not final_link:
         flask.abort(404)
