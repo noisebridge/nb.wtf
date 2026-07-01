@@ -127,6 +127,23 @@ def wiki_redirect(slug):
     return flask.redirect(final_link)
 
 
+@app.route("/u/<path:name>")
+@app.route("/U/<path:name>")
+def user_redirect(name):
+    # /u/audiodude -> wiki User:audiodude (incl. sub / sub-sub pages). We
+    # leave the first-letter capitalization to MediaWiki. Colons are escaped
+    # so urljoin doesn't mistake "User:" for a URL scheme.
+    title = "User:" + name
+    colon_escaped = title.replace(":", "%3A")
+    final_link = urljoin(WIKI_BASE_URL, colon_escaped)
+
+    qr = maybe_qr(qr_target("u/", name))
+    if qr is not None:
+        return qr
+
+    return flask.redirect(final_link)
+
+
 @app.route("/<slug>")
 def redirect(slug):
     with get_db() as conn:
