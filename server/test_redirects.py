@@ -73,23 +73,58 @@ def test_shortcode_redirects(client, seed, slug, status, location):
         assert resp.headers["Location"] == location
 
 
-def test_shortcode_is_currently_case_sensitive(client, seed):
-    """Documents today's exact-case lookup. The qr-all branch makes this
-    COLLATE NOCASE, at which point this row flips to a 302."""
+def test_shortcode_lookup_is_case_insensitive(client, seed):
+    """Lookup is COLLATE NOCASE, so an all-caps shortcode still resolves to
+    the same destination — you can always uppercase a slug for a dense QR."""
     seed(SEED)
-    assert client.get("/NOISETABLE").status_code == 404
+    resp = client.get("/NOISETABLE")
+    assert resp.status_code == 302
+    assert resp.headers["Location"] == "https://www.noisebridge.net/wiki/NoiseTable"
 
 
-# --- QR generation --------------------------------------------------------
-# Today the QR encodes the *destination* URL. The qr-all branch changes this
-# to the nb.wtf short link; these byte-for-byte expectations will change then.
+def test_uppercase_wiki_prefix_route(client):
+    """An all-caps QR link reads /W/...; the server must serve it too."""
+    resp = client.get("/W/FOOBAR")
+    assert resp.status_code == 302
+    assert resp.headers["Location"] == f"{WIKI}/FOOBAR"
 
-def test_qr_png_encodes_destination(client, seed):
+
+# --- qr_target: the case-mirroring core (encode the nb.wtf short link) -----
+
+# (prefix, slug, expected encoded URL)
+QR_TARGETS = [
+    ("", "NoiseTable", "https://nb.wtf/NoiseTable"),
+    ("", "NOISETABLE", "HTTPS://NB.WTF/NOISETABLE"),
+    ("w/", "FooBar", "https://nb.wtf/w/FooBar"),
+    ("w/", "FOOBAR", "HTTPS://NB.WTF/W/FOOBAR"),
+    ("u/", "mcint", "https://nb.wtf/u/mcint"),
+    ("u/", "MCINT", "HTTPS://NB.WTF/U/MCINT"),
+]
+
+
+@pytest.mark.parametrize("prefix, slug, expected", QR_TARGETS)
+def test_qr_target(app_module, prefix, slug, expected):
+    assert app_module.qr_target(prefix, slug) == expected
+
+
+# --- QR generation: now encodes the nb.wtf short link, case-mirrored ------
+
+# (path, expected encoded URL) — QR image must match segno output for the URL
+QR_ENCODINGS = [
+    ("/NoiseTable?qr", "https://nb.wtf/NoiseTable"),
+    ("/NOISETABLE?qr", "HTTPS://NB.WTF/NOISETABLE"),  # dense, via COLLATE NOCASE
+    ("/w/FooBar?qr", "https://nb.wtf/w/FooBar"),
+    ("/W/FOOBAR?qr", "HTTPS://NB.WTF/W/FOOBAR"),
+]
+
+
+@pytest.mark.parametrize("path, encoded", QR_ENCODINGS)
+def test_qr_png_encodes_short_link(client, seed, path, encoded):
     seed(SEED)
-    resp = client.get("/NoiseTable?qr")
+    resp = client.get(path)
     assert resp.status_code == 200
     assert resp.mimetype == "image/png"
-    assert resp.data == png_bytes("https://www.noisebridge.net/wiki/NoiseTable")
+    assert resp.data == png_bytes(encoded)
 
 
 def test_qr_svg(client, seed):
@@ -97,16 +132,14 @@ def test_qr_svg(client, seed):
     resp = client.get("/NoiseTable?qr=svg")
     assert resp.status_code == 200
     assert resp.mimetype == "image/svg+xml"
-    assert resp.data == svg_bytes("https://www.noisebridge.net/wiki/NoiseTable")
+    assert resp.data == svg_bytes("https://nb.wtf/NoiseTable")
 
 
 def test_qr_scale(client, seed):
     seed(SEED)
     resp = client.get("/NoiseTable?qr&s=4")
     assert resp.status_code == 200
-    assert resp.data == png_bytes(
-        "https://www.noisebridge.net/wiki/NoiseTable", scale=4
-    )
+    assert resp.data == png_bytes("https://nb.wtf/NoiseTable", scale=4)
 
 
 # --- Scrape / on_update parser (no live wiki) -----------------------------
