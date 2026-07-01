@@ -47,6 +47,23 @@ def test_static_redirects(client, path, status, location):
     assert resp.headers["Location"] == location
 
 
+# /u/<name> -> wiki User:<name>, incl. sub / sub-sub pages and the /U/ prefix.
+# First-letter capitalization is left to MediaWiki (we don't munge the name).
+USER_REDIRECTS = [
+    ("/u/audiodude", 302, f"{WIKI}/User%3Aaudiodude"),
+    ("/u/mcint/foo", 302, f"{WIKI}/User%3Amcint/foo"),  # subpage
+    ("/u/mcint/foo/bar", 302, f"{WIKI}/User%3Amcint/foo/bar"),  # sub-subpage
+    ("/U/MCINT", 302, f"{WIKI}/User%3AMCINT"),  # uppercase prefix route
+]
+
+
+@pytest.mark.parametrize("path, status, location", USER_REDIRECTS)
+def test_user_redirects(client, path, status, location):
+    resp = client.get(path)
+    assert resp.status_code == status
+    assert resp.headers["Location"] == location
+
+
 # --- Shortcode routes: DB-backed ------------------------------------------
 
 SEED = {
@@ -115,6 +132,8 @@ QR_ENCODINGS = [
     ("/NOISETABLE?qr", "HTTPS://NB.WTF/NOISETABLE"),  # dense, via COLLATE NOCASE
     ("/w/FooBar?qr", "https://nb.wtf/w/FooBar"),
     ("/W/FOOBAR?qr", "HTTPS://NB.WTF/W/FOOBAR"),
+    ("/u/mcint?qr", "https://nb.wtf/u/mcint"),
+    ("/U/MCINT?qr", "HTTPS://NB.WTF/U/MCINT"),
 ]
 
 
