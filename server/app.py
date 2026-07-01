@@ -20,6 +20,9 @@ USER_AGENT = "nb-wtf/1.0 <audiodude@gmail.com>"
 
 RE_SELF_LINK = re.compile(r"^https?://nb.wtf")
 
+# Canonical short host the QR codes point back into.
+SHORT_HOST = "nb.wtf"
+
 
 def get_db():
     conn = sqlite3.connect(SQLITE_PATH)
@@ -52,6 +55,36 @@ def qr_code(link, mimetype="image/png", scale=8):
     return out
 
 
+def qr_target(prefix, slug):
+    """The nb.wtf short link to encode in the QR, case-mirrored.
+
+    We never alter the slug's case (we can't know a wiki page's true case
+    without parsing, and Anubis blocks that). We only vary the front part
+    (scheme + host + prefix): if the slug has no lowercase letters, the whole
+    URL is uppercased so it fits QR's dense alphanumeric mode; otherwise it
+    stays lowercase so it matches exactly what the user typed. `prefix` is
+    "" for a bare shortcode, "w/" for wiki, "u/" for user pages.
+    """
+    path = prefix + slug
+    if slug == slug.upper():  # slug has no lowercase letters
+        return f"HTTPS://{SHORT_HOST.upper()}/{path.upper()}"
+    return f"https://{SHORT_HOST}/{path}"
+
+
+def maybe_qr(target):
+    """If the request asked for a QR (?qr, ?qr=svg, ?s=<scale>), return the
+    image response for `target`; otherwise None so the caller redirects."""
+    if "qr" not in flask.request.args:
+        return None
+    mimetype = "image/png"
+    if flask.request.args["qr"] == "svg":
+        mimetype = "image/svg+xml"
+    scale = int(flask.request.args.get("s", 8))
+    return flask.send_file(
+        qr_code(target, mimetype=mimetype, scale=scale), mimetype=mimetype
+    )
+
+
 @app.route("/")
 def index():
     return flask.redirect("https://www.noisebridge.net/wiki/Nb.wtf")
@@ -82,16 +115,24 @@ def update():
 
 
 @app.route("/w/<path:slug>")
+@app.route("/W/<path:slug>")
 def wiki_redirect(slug):
     colon_escaped = slug.replace(":", "%3A")
     final_link = urljoin(WIKI_BASE_URL, colon_escaped)
+
+    qr = maybe_qr(qr_target("w/", slug))
+    if qr is not None:
+        return qr
+
     return flask.redirect(final_link)
 
 
 @app.route("/<slug>")
 def redirect(slug):
     with get_db() as conn:
-        row = conn.execute("SELECT url FROM links WHERE slug = ?", (slug,)).fetchone()
+        row = conn.execute(
+            "SELECT url FROM links WHERE slug = ? COLLATE NOCASE", (slug,)
+        ).fetchone()
     if not row:
         flask.abort(404)
 
@@ -102,15 +143,9 @@ def redirect(slug):
     if RE_SELF_LINK.search(final_link):
         flask.abort(400, "Self-referential links are not allowed")
 
-    if "qr" in flask.request.args:
-        print("generating QR code")
-        mimetype = "image/png"
-        if flask.request.args["qr"] == "svg":
-            mimetype = "image/svg+xml"
-        scale = int(flask.request.args.get("s", 8))
-        return flask.send_file(
-            qr_code(final_link, mimetype=mimetype, scale=scale), mimetype=mimetype
-        )
+    qr = maybe_qr(qr_target("", slug))
+    if qr is not None:
+        return qr
 
     print("redirecting to", final_link)
     return flask.redirect(final_link)
