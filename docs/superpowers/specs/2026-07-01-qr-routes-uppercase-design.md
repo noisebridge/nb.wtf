@@ -33,6 +33,10 @@ extend the same tabular test pattern.
 - Browser-extension feature: embed a page's `/w/` shortlink + a QR button
   directly on wiki pages.
 - Generalizing the shortener to other sites with their own shorteners.
+- Advisory error-surfacing for uppercase best-effort (e.g. an HTTP header
+  on the redirect, or a short jargon hint carried in the URL fragment).
+  Only relevant to wiki/user pages and low value on a redirect (mostly
+  seen by devs/testing), so parked.
 
 ## Cross-cutting decisions (shape PR 2 and PR 3)
 
@@ -84,11 +88,33 @@ Why this shape:
 
 Flask routes are case-sensitive by default. Because an all-caps QR link
 reads `.../W/...` or `.../U/...`, the server must serve **both**
-`/w/` and `/W/` (and `/u/` and `/U/`). Bare shortcodes already match any
-case via `/<slug>`; their resolution is unchanged (exact-case DB lookup).
+`/w/` and `/W/` (and `/u/` and `/U/`).
 
 Implementation options (decide in PR 2/3 plan): register both-cased
 routes, or a single route with a case-insensitive prefix converter.
+
+### 3b. Shortcode lookups are case-insensitive
+
+Bare shortcodes match any case via `/<slug>`, and the DB lookup is made
+**case-insensitive** (`COLLATE NOCASE`). So `/FOOBAR` always resolves to
+`FooBar`'s destination — you can **always** uppercase a shortcode to get a
+dense alphanumeric QR, with no usability cliff. This is the one place we
+*can* guarantee uppercase works, because we own the lookup (unlike wiki /
+user titles, which MediaWiki resolves case-sensitively).
+
+Minor accepted risk: two slugs differing only in case (`noisetable` vs
+`NoiseTable`) would collide. Slugs are human-authored on the wiki table;
+we accept and note it rather than solve it.
+
+### 3c. Wiki/user redirects emit the literal `/wiki/…` read URL
+
+`/w/` and `/u/` redirect to the canonical `/wiki/<Title>` read URL (which
+the wiki rewrites to `index.php?title=<Title>`). The title keeps a **literal
+colon** (`/wiki/User:audiodude`), built by string concatenation rather than
+`urljoin` — `urljoin` would read `User:` as a URL scheme. (The old `/w/`
+route escaped the colon to `%3A` purely to survive `urljoin`; dropping
+`urljoin` removes the need and yields the cleaner, rewrite-safe literal
+form.)
 
 ### 4. When uppercase auto-works (this becomes the docs)
 
@@ -130,7 +156,7 @@ then `/w/FOOBAR?qr` is both dense and resolves through the wiki redirect.
 - Extend `/w/` and (bare) `/<slug>` to honor `?qr`, `?qr=svg`, `?s=<n>`,
   encoding the **nb.wtf short link** per decision 1.
 - Add uppercase-prefix route acceptance (decision 3) so all-caps QR links
-  resolve.
+  resolve, and make the shortcode DB lookup `COLLATE NOCASE` (decision 3b).
 - **Behavior-change** test: `/<slug>?qr` now encodes the short link, not
   the destination. Update/add tabular cases (decode the QR and assert the
   encoded string, incl. the uppercase-front cases).
