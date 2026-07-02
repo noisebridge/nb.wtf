@@ -84,6 +84,7 @@ def test_shortcode_is_currently_case_sensitive(client, seed):
 # Today the QR encodes the *destination* URL. The qr-all branch changes this
 # to the nb.wtf short link; these byte-for-byte expectations will change then.
 
+
 def test_qr_png_encodes_destination(client, seed):
     seed(SEED)
     resp = client.get("/NoiseTable?qr")
@@ -135,7 +136,9 @@ def test_on_update_parses_table(client, app_module, monkeypatch):
     assert resp.status_code == 200
 
     with app_module.get_db() as conn:
-        rows = {r["slug"]: r["url"] for r in conn.execute("SELECT slug, url FROM links")}
+        rows = {
+            r["slug"]: r["url"] for r in conn.execute("SELECT slug, url FROM links")
+        }
 
     assert rows == {
         "NoiseTable": "https://www.noisebridge.net/wiki/NoiseTable",
